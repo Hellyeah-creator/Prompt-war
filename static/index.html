@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Hiring Committee</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <!-- Marked.js for parsing markdown to HTML -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <div class="background-blob blob-1"></div>
+    <div class="background-blob blob-2"></div>
+
+    <div class="container">
+        <header>
+            <h1>AI Hiring Committee</h1>
+            <p>Upload candidate documents and watch as 4 specialized AI agents evaluate, debate, and render a final hiring decision.</p>
+        </header>
+
+        <main>
+            <form id="evaluationForm" class="glass-panel">
+                <div class="input-group">
+                    <label for="apiKey">Gemini API Key</label>
+                    <input type="password" id="apiKey" name="apiKey" required placeholder="AIzaSy..." />
+                </div>
+                
+                <div class="input-group">
+                    <label for="candidateName">Candidate Name</label>
+                    <input type="text" id="candidateName" name="candidateName" required placeholder="e.g. Candidate A" />
+                </div>
+
+                <div class="file-uploads">
+                    <div class="file-upload-box">
+                        <label for="jdFile">Job Description (PDF)</label>
+                        <input type="file" id="jdFile" name="jdFile" accept=".pdf" required />
+                    </div>
+                    <div class="file-upload-box">
+                        <label for="resumeFile">Resume (PDF)</label>
+                        <input type="file" id="resumeFile" name="resumeFile" accept=".pdf" required />
+                    </div>
+                    <div class="file-upload-box">
+                        <label for="transcriptFile">Interview Transcript (PDF)</label>
+                        <input type="file" id="transcriptFile" name="transcriptFile" accept=".pdf" required />
+                    </div>
+                </div>
+
+                <button type="submit" id="submitBtn">Start Evaluation Pipeline</button>
+            </form>
+
+            <div id="progressContainer" class="glass-panel hidden">
+                <h2>Live Progress</h2>
+                <div class="spinner"></div>
+                <ul id="eventLog"></ul>
+            </div>
+
+            <div id="reportContainer" class="glass-panel hidden">
+                <h2>Final Evaluation Report</h2>
+                <div id="reportContent"></div>
+                <button id="resetBtn" onclick="location.reload()">Evaluate Another Candidate</button>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
