@@ -1,0 +1,136 @@
+import os
+import json
+from typing import List, Optional, TypedDict
+from google import genai
+from google.genai import types
+
+# ---------------------------------------------------------
+# 1. Shared Data Schema
+# ---------------------------------------------------------
+class Experience(TypedDict):
+    role: str
+    company: str
+    duration: str
+    resume_claims: List[str]
+
+class SkillValidation(TypedDict):
+    skill: str
+    claimed_on_resume: bool
+    demonstrated_in_interview: bool
+    interview_evidence: Optional[str]
+
+class Basics(TypedDict):
+    name: str
+    contact: str
+
+class CandidateProfile(TypedDict):
+    candidate_id: str
+    basics: Basics
+    experience_timeline: List[Experience]
+    skill_validation: List[SkillValidation]
+    interview_insights: List[str]
+    discrepancies: List[str]
+
+# ---------------------------------------------------------
+# 2. PDF Ingestion Helper (Using Gemini File API)
+# ---------------------------------------------------------
+def upload_pdf(client: genai.Client, pdf_path: str):
+    if not os.path.exists(pdf_path):
+        raise FileNotFoundError(f"Missing file: {pdf_path}")
+    print(f"Uploading {pdf_path} to Gemini...")
+    return client.files.upload(file=pdf_path)
+
+# ---------------------------------------------------------
+# 3. Extraction with Gemini Free API
+# ---------------------------------------------------------
+def build_profile(
+    client: genai.Client,
+    candidate_id: str,
+    job_desc_file,
+    resume_file,
+    transcript_file
+) -> dict:
+    prompt = f"""
+    You are an objective HR data extractor. Cross-reference the candidate's resume with their interview transcript.
+    Evaluate their demonstrated skills against the provided Job Description context.
+    Do not hallucinate. Extract exact quotes for evidence.
+
+    Guidelines for output JSON fields:
+    - resume_claims: Claims explicitly made on the resume
+    - interview_evidence: Quote from transcript proving/disproving the skill
+    - interview_insights: Key technical or behavioral takeaways
+    - discrepancies: Contradictions between resume and interview
+    - basics: Name and contact info
+
+    Candidate ID: {candidate_id}
+
+    Please refer to the attached files:
+    1. Job Description
+    2. Candidate Resume
+    3. Interview Transcript
+    """
+
+    response = client.models.generate_content(
+        model='gemini-3.5-flash-lite',
+        contents=[job_desc_file, resume_file, transcript_file, prompt],
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=CandidateProfile,
+            temperature=0.1
+        )
+    )
+    
+    return json.loads(response.text)
+
+# ---------------------------------------------------------
+# 4. Main Orchestrator
+# ---------------------------------------------------------
+def main():
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise ValueError("Set GEMINI_API_KEY environment variable (Free tier from Google AI Studio).")
+
+    client = genai.Client(api_key=api_key)
+
+    files = {
+        "jd": "/Users/anubhavkumar/Downloads/02_Job_Description.pdf",
+        "resume_a": "/Users/anubhavkumar/Downloads/03_Resume_A.pdf",
+        "resume_b": "/Users/anubhavkumar/Downloads/04_Resume_B.pdf",
+        "transcript_a": "/Users/anubhavkumar/Downloads/05_Transcript_A.pdf",
+        "transcript_b": "/Users/anubhavkumar/Downloads/06_Transcript_B.pdf"
+    }
+
+    job_desc_file = upload_pdf(client, files["jd"])
+    
+    candidates = [
+        {
+            "id": "Candidate_A", 
+            "resume": upload_pdf(client, files["resume_a"]), 
+            "transcript": upload_pdf(client, files["transcript_a"])
+        },
+        {
+            "id": "Candidate_B", 
+            "resume": upload_pdf(client, files["resume_b"]), 
+            "transcript": upload_pdf(client, files["transcript_b"])
+        }
+    ]
+
+    final_database = {}
+    for c in candidates:
+        print(f"Extracting {c['id']}...")
+        profile_json = build_profile(
+            client=client,
+            candidate_id=c["id"],
+            job_desc_file=job_desc_file,
+            resume_file=c["resume"],
+            transcript_file=c["transcript"]
+        )
+        final_database[c["id"]] = profile_json
+
+    with open("candidate_profiles_db.json", "w") as f:
+        json.dump(final_database, f, indent=2)
+
+    print("Success! Saved profiles to candidate_profiles_db.json")
+
+if __name__ == "__main__":
+    main()
