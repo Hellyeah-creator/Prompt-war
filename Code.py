@@ -1,10 +1,20 @@
 import os
 import json
+import socket
 from typing import List, Dict
 from pydantic import BaseModel, Field
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
+
+# --- Mac / IPv6 Hang Fix ---
+# Force Python to use IPv4 instead of IPv6. 
+# This prevents httpx from hanging on broken IPv6 networks (common on Mac).
+old_getaddrinfo = socket.getaddrinfo
+def new_getaddrinfo(*args, **kwargs):
+    responses = old_getaddrinfo(*args, **kwargs)
+    return [res for res in responses if res[0] == socket.AF_INET]
+socket.getaddrinfo = new_getaddrinfo
 
 # Load environment variables from the .env file
 load_dotenv()
@@ -46,11 +56,13 @@ client = None
 MODEL = "gemini-3.5-flash-lite"
 
 def upload_pdf(file_path: str):
-    print(f"Uploading {file_path} to Gemini...")
-    return client.files.upload(file=file_path)
+    print(f"Uploading {file_path} to Gemini...", flush=True)
+    uploaded_file = client.files.upload(file=file_path)
+    print(f"Finished uploading {file_path}.", flush=True)
+    return uploaded_file
 
 def build_profile(jd_file, resume_file, transcript_file) -> CandidateProfile:
-    print("Building Candidate Profile...")
+    print("Building Candidate Profile...", flush=True)
     prompt = """
     You are a Candidate Profile Builder. Your job is to read the provided Job Description, Resume, and Interview Transcript, 
     and extract the basic facts about the candidate. 
@@ -72,7 +84,7 @@ def build_profile(jd_file, resume_file, transcript_file) -> CandidateProfile:
     return CandidateProfile.model_validate_json(response.text)
 
 def evaluate_candidate(jd_file, resume_file, transcript_file, profile: CandidateProfile, persona: str, instructions: str) -> AgentEvaluation:
-    print(f"Evaluating as {persona}...")
+    print(f"Evaluating as {persona}...", flush=True)
     
     prompt = f"""
     You are the {persona}. 
@@ -102,7 +114,7 @@ def evaluate_candidate(jd_file, resume_file, transcript_file, profile: Candidate
     return AgentEvaluation.model_validate_json(response.text)
 
 def debate_stage(this_eval: AgentEvaluation, other_evals: List[AgentEvaluation], persona: str, persona_instructions: str) -> DebateResponse:
-    print(f"Running Debate Step for {persona}...")
+    print(f"Running Debate Step for {persona}...", flush=True)
     
     other_evaluations_json = json.dumps(
         [eval.model_dump() for eval in other_evals], 
@@ -137,7 +149,7 @@ def debate_stage(this_eval: AgentEvaluation, other_evals: List[AgentEvaluation],
     return DebateResponse.model_validate_json(response.text)
 
 def make_final_decision(evaluations: List[AgentEvaluation], debate_responses: List[DebateResponse]) -> FinalDecision:
-    print("Making Final Hiring Decision...")
+    print("Making Final Hiring Decision...", flush=True)
     
     evals_json = json.dumps([e.model_dump() for e in evaluations], indent=2)
     debates_json = json.dumps([d.model_dump() for d in debate_responses], indent=2)

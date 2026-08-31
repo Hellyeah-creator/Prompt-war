@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import socket
 from typing import List
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.responses import HTMLResponse, StreamingResponse
@@ -8,6 +9,13 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from google import genai
 from google.genai import types
+
+# --- Mac / IPv6 Hang Fix ---
+old_getaddrinfo = socket.getaddrinfo
+def new_getaddrinfo(*args, **kwargs):
+    responses = old_getaddrinfo(*args, **kwargs)
+    return [res for res in responses if res[0] == socket.AF_INET]
+socket.getaddrinfo = new_getaddrinfo
 
 # Import the models from Code
 from Code import CandidateProfile, AgentEvaluation, DebateResponse, FinalDecision, MODEL
